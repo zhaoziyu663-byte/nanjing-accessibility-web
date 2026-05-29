@@ -1,0 +1,691 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>南京市多模式空间可达性分析</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <style>
+    :root {
+      --bg: #f4f6f8;
+      --panel: #ffffff;
+      --line: #d8dee6;
+      --text: #1f2933;
+      --muted: #687586;
+      --accent: #2a6f97;
+      --accent-soft: #e6f1f6;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Microsoft YaHei", "PingFang SC", "Segoe UI", Arial, sans-serif;
+      color: var(--text);
+      background: var(--bg);
+    }
+
+    .app {
+      display: grid;
+      grid-template-columns: 390px minmax(0, 1fr);
+      height: 100vh;
+      min-height: 680px;
+    }
+
+    .sidebar {
+      background: var(--panel);
+      border-right: 1px solid var(--line);
+      overflow-y: auto;
+      padding: 22px 20px 18px;
+    }
+
+    .title {
+      margin: 0 0 8px;
+      font-size: 22px;
+      line-height: 1.25;
+      font-weight: 700;
+    }
+
+    .subtitle {
+      margin: 0 0 18px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.65;
+    }
+
+    .section {
+      border-top: 1px solid var(--line);
+      padding-top: 16px;
+      margin-top: 16px;
+    }
+
+    .section-title {
+      margin: 0 0 10px;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .hint {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.55;
+    }
+
+    .coord {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .coord div {
+      border: 1px solid var(--line);
+      padding: 8px;
+      background: #fafbfc;
+      font-size: 12px;
+    }
+
+    .coord span {
+      display: block;
+      margin-top: 4px;
+      font-family: Consolas, "Courier New", monospace;
+      color: #111827;
+    }
+
+    .segmented {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    .segmented button {
+      border: 0;
+      border-right: 1px solid var(--line);
+      background: #fff;
+      color: var(--text);
+      padding: 9px 6px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .segmented button:last-child {
+      border-right: 0;
+    }
+
+    .segmented button.active {
+      background: var(--accent-soft);
+      color: #164e63;
+      font-weight: 700;
+    }
+
+    .radio-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .radio-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+    }
+
+    select,
+    button.run {
+      width: 100%;
+      min-height: 38px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+      color: var(--text);
+      font-size: 13px;
+      padding: 0 10px;
+    }
+
+    button.run {
+      margin-top: 12px;
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    button.run:disabled {
+      cursor: wait;
+      opacity: 0.72;
+    }
+
+    .status {
+      margin-top: 10px;
+      min-height: 20px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .status.error {
+      color: #b42318;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .summary-item {
+      border: 1px solid var(--line);
+      background: #fafbfc;
+      padding: 8px;
+      font-size: 12px;
+      min-height: 58px;
+    }
+
+    .summary-item strong {
+      display: block;
+      margin-top: 4px;
+      font-size: 15px;
+      color: #111827;
+    }
+
+    .table-wrap {
+      margin-top: 10px;
+      max-height: 360px;
+      overflow: auto;
+      border: 1px solid var(--line);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      background: #fff;
+    }
+
+    th,
+    td {
+      border-bottom: 1px solid #edf1f5;
+      padding: 7px 8px;
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      background: #f7f9fb;
+      color: #334155;
+      font-weight: 700;
+    }
+
+    th:first-child,
+    td:first-child,
+    th:nth-child(2),
+    td:nth-child(2) {
+      text-align: left;
+    }
+
+    .radar-box {
+      height: 310px;
+      margin-top: 10px;
+      border: 1px solid var(--line);
+      background: #fff;
+      padding: 10px;
+    }
+
+    .map-wrap {
+      position: relative;
+      min-width: 0;
+    }
+
+    #map {
+      position: absolute;
+      inset: 0;
+      background: #e8ecef;
+    }
+
+    .map-note {
+      position: absolute;
+      z-index: 500;
+      left: 14px;
+      bottom: 14px;
+      max-width: 390px;
+      background: rgba(255, 255, 255, 0.94);
+      border: 1px solid var(--line);
+      padding: 9px 11px;
+      font-size: 12px;
+      line-height: 1.55;
+      color: #334155;
+    }
+
+    .legend {
+      display: grid;
+      gap: 5px;
+      margin-top: 8px;
+      font-size: 12px;
+    }
+
+    .legend-row {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .swatch {
+      width: 15px;
+      height: 15px;
+      border: 1px solid currentColor;
+      opacity: 0.72;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    @media (max-width: 980px) {
+      .app {
+        grid-template-columns: 1fr;
+        grid-template-rows: 470px minmax(480px, auto);
+        height: auto;
+      }
+
+      .map-wrap {
+        grid-row: 1;
+      }
+
+      .sidebar {
+        grid-row: 2;
+        border-right: 0;
+        border-top: 1px solid var(--line);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <h1 class="title">南京市多模式空间可达性分析</h1>
+      <p class="subtitle">由于路网数据需要时间进入缓存，首次生成可能速度较慢~</p>
+
+      <section class="section">
+        <h2 class="section-title">出发点</h2>
+        <p class="hint">在地图上点击任意位置设为出发点，该点会自动吸附到对应路网。</p>
+        <div class="coord">
+          <div>经度<span id="lonText">118.78200</span></div>
+          <div>纬度<span id="latText">32.04200</span></div>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2 class="section-title">出行模式</h2>
+        <div class="segmented" id="modeButtons">
+          <button type="button" data-mode="walk">步行</button>
+          <button type="button" data-mode="bike">骑行</button>
+          <button type="button" data-mode="drive" class="active">驾车</button>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2 class="section-title">分析类型</h2>
+        <div class="radio-list">
+          <label class="radio-row"><input type="radio" name="analysisType" value="isochrone" checked> 等时圈分析</label>
+          <label class="radio-row"><input type="radio" name="analysisType" value="accessibility"> POI 可达性分析</label>
+        </div>
+        <div id="timeControl" style="margin-top: 12px;">
+          <select id="minuteSelect" aria-label="等时圈时间阈值">
+            <option value="5">5 min</option>
+            <option value="15">15 min</option>
+            <option value="25">25 min</option>
+            <option value="35">35 min</option>
+            <option value="45">45 min</option>
+            <option value="55">55 min</option>
+            <option value="65" selected>65 min</option>
+          </select>
+          <p class="hint">选择最大时间阈值后，地图会显示从 5 min 到该阈值的非重叠时间带。</p>
+        </div>
+        <button class="run" id="runButton" type="button">开始分析</button>
+        <div class="status" id="statusText">当前为新街口默认出发点。</div>
+      </section>
+
+      <section class="section">
+        <h2 class="section-title">分析结果</h2>
+        <div class="summary-grid" id="summaryGrid"></div>
+        <div id="legendBox" class="legend"></div>
+        <div id="tableWrap" class="table-wrap hidden"></div>
+        <div id="radarBox" class="radar-box hidden"><canvas id="radarChart"></canvas></div>
+      </section>
+    </aside>
+
+    <main class="map-wrap">
+      <div id="map"></div>
+      <div class="map-note">等时圈已生成</div>
+    </main>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script>
+    const DEFAULT_ORIGIN = { lon: 118.782, lat: 32.042 };
+    const modeLabels = { walk: "步行", bike: "骑行", drive: "驾车" };
+    const state = {
+      lon: DEFAULT_ORIGIN.lon,
+      lat: DEFAULT_ORIGIN.lat,
+      mode: "drive"
+    };
+
+    let map;
+    let originMarker;
+    let baseLayers;
+    let layerControl;
+    let dynamicLayers = [];
+    let radarChart;
+
+    function initMap() {
+      const carto = L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
+        maxZoom: 19,
+        attribution: "&copy; OpenStreetMap contributors &copy; CARTO"
+      });
+      const osm = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution: "&copy; OpenStreetMap contributors"
+      });
+      const esri = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}", {
+        maxZoom: 19,
+        attribution: "Tiles &copy; Esri"
+      });
+
+      map = L.map("map", {
+        center: [state.lat, state.lon],
+        zoom: 12,
+        layers: [carto],
+        preferCanvas: true
+      });
+
+      baseLayers = {
+        "浅色底图": carto,
+        "OpenStreetMap": osm,
+        "Esri 街道底图": esri
+      };
+      rebuildLayerControl({});
+      setOrigin(state.lon, state.lat, false);
+
+      map.on("click", (event) => {
+        setOrigin(event.latlng.lng, event.latlng.lat, true);
+      });
+    }
+
+    function rebuildLayerControl(overlays) {
+      if (layerControl) {
+        map.removeControl(layerControl);
+      }
+      layerControl = L.control.layers(baseLayers, overlays, { collapsed: false }).addTo(map);
+    }
+
+    function setOrigin(lon, lat, fromClick) {
+      state.lon = Number(lon);
+      state.lat = Number(lat);
+      document.getElementById("lonText").textContent = state.lon.toFixed(5);
+      document.getElementById("latText").textContent = state.lat.toFixed(5);
+
+      if (originMarker) {
+        originMarker.setLatLng([state.lat, state.lon]);
+      } else {
+        originMarker = L.circleMarker([state.lat, state.lon], {
+          radius: 7,
+          color: "#ffffff",
+          weight: 2,
+          fillColor: "#d00000",
+          fillOpacity: 0.95
+        }).addTo(map).bindTooltip("出发点");
+      }
+      if (fromClick) {
+        setStatus("已更新出发点，请点击“开始分析”。");
+      }
+    }
+
+    function setStatus(text, isError = false) {
+      const el = document.getElementById("statusText");
+      el.textContent = text;
+      el.classList.toggle("error", isError);
+    }
+
+    function setLoading(loading) {
+      const button = document.getElementById("runButton");
+      button.disabled = loading;
+      button.textContent = loading ? "计算中..." : "开始分析";
+    }
+
+    function clearDynamicLayers() {
+      dynamicLayers.forEach((layer) => map.removeLayer(layer));
+      dynamicLayers = [];
+      rebuildLayerControl({});
+    }
+
+    function renderSummary(items) {
+      const grid = document.getElementById("summaryGrid");
+      grid.innerHTML = items.map((item) => `
+        <div class="summary-item">${item.label}<strong>${item.value}</strong></div>
+      `).join("");
+    }
+
+    function renderLegend(features) {
+      const box = document.getElementById("legendBox");
+      if (!features || features.length === 0) {
+        box.innerHTML = "";
+        return;
+      }
+      box.innerHTML = features.map((feature) => {
+        const props = feature.properties;
+        return `
+          <div class="legend-row">
+            <span class="swatch" style="background:${props.color};color:${props.color};"></span>
+            <span>${props.label}</span>
+          </div>
+        `;
+      }).join("");
+    }
+
+    function hideAccessibilityOutput() {
+      document.getElementById("tableWrap").classList.add("hidden");
+      document.getElementById("radarBox").classList.add("hidden");
+      if (radarChart) {
+        radarChart.destroy();
+        radarChart = null;
+      }
+    }
+
+    function plotIsochrone(data) {
+      clearDynamicLayers();
+      hideAccessibilityOutput();
+
+      const overlays = {};
+      const features = data.geojson.features || [];
+      features.forEach((feature) => {
+        const props = feature.properties;
+        const layer = L.geoJSON(feature, {
+          style: () => ({
+            color: props.color,
+            weight: props.weight,
+            opacity: 0.78,
+            fillColor: props.color,
+            fillOpacity: 0.36
+          }),
+          onEachFeature: (_, leafletLayer) => {
+            leafletLayer.bindTooltip(`${data.mode_label} ${props.label}`);
+          }
+        }).addTo(map);
+        overlays[props.label] = layer;
+        dynamicLayers.push(layer);
+      });
+      rebuildLayerControl(overlays);
+
+      if (dynamicLayers.length > 0) {
+        const group = L.featureGroup(dynamicLayers);
+        map.fitBounds(group.getBounds(), { padding: [24, 24], maxZoom: 14 });
+      }
+
+      renderLegend(features);
+      renderSummary([
+        { label: "模式", value: data.mode_label },
+        { label: "最大阈值", value: `${data.minutes} min` },
+        { label: "可达节点", value: data.stats.reachable_nodes.toLocaleString("zh-CN") },
+        { label: "可达边", value: data.stats.reachable_edges.toLocaleString("zh-CN") },
+        { label: "面积", value: `${data.stats.area_km2} km²` },
+        { label: "吸附距离", value: `${data.snap.snap_distance_m} m` }
+      ]);
+      setStatus(`等时圈计算完成，用时 ${data.stats.elapsed_seconds} 秒。`);
+    }
+
+    function renderAccessibilityTable(rows) {
+      const wrap = document.getElementById("tableWrap");
+      const columns = [
+        "时间阈值_min",
+        "类别",
+        "类别总数",
+        "可达POI数量",
+        "类别覆盖率_%",
+        "距离衰减有效数量",
+        "时间衰减得分",
+        "对数压缩得分",
+        "标准化可达性指数_0_100"
+      ];
+      wrap.innerHTML = `
+        <table>
+          <thead><tr>${columns.map((col) => `<th>${col}</th>`).join("")}</tr></thead>
+          <tbody>
+            ${rows.map((row) => `
+              <tr>${columns.map((col) => `<td>${row[col]}</td>`).join("")}</tr>
+            `).join("")}
+          </tbody>
+        </table>
+      `;
+      wrap.classList.remove("hidden");
+    }
+
+    function renderRadar(radar) {
+      const box = document.getElementById("radarBox");
+      box.classList.remove("hidden");
+      const ctx = document.getElementById("radarChart");
+      if (radarChart) {
+        radarChart.destroy();
+      }
+      radarChart = new Chart(ctx, {
+        type: "radar",
+        data: {
+          labels: radar.labels,
+          datasets: radar.datasets.map((dataset) => ({
+            label: dataset.label,
+            data: dataset.data,
+            borderColor: dataset.borderColor,
+            backgroundColor: dataset.backgroundColor,
+            borderWidth: 2,
+            pointRadius: 2
+          }))
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: "top",
+              labels: { boxWidth: 12, font: { size: 11 } }
+            }
+          },
+          scales: {
+            r: {
+              min: 0,
+              max: 100,
+              ticks: { stepSize: 20, backdropColor: "transparent", font: { size: 10 } },
+              grid: { color: "#d9e0e7" },
+              angleLines: { color: "#d9e0e7" },
+              pointLabels: { font: { size: 12 } }
+            }
+          }
+        }
+      });
+    }
+
+    function plotAccessibility(data) {
+      clearDynamicLayers();
+      renderLegend([]);
+      renderAccessibilityTable(data.table);
+      renderRadar(data.radar);
+      renderSummary([
+        { label: "模式", value: data.mode_label },
+        { label: "评分阈值", value: "10 / 15 / 25 min" },
+        { label: "POI 类别", value: data.radar.labels.length },
+        { label: "表格记录", value: data.table.length },
+        { label: "吸附距离", value: `${data.meta.snap.snap_distance_m} m` },
+        { label: "归一化基准", value: data.meta.global_max_log_score }
+      ]);
+      setStatus("POI 可达性评分完成。");
+    }
+
+    async function fetchJson(url) {
+      const response = await fetch(url);
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "请求失败");
+      }
+      return data;
+    }
+
+    async function runAnalysis() {
+      const type = document.querySelector("input[name='analysisType']:checked").value;
+      const params = new URLSearchParams({
+        lon: state.lon.toFixed(6),
+        lat: state.lat.toFixed(6),
+        mode: state.mode
+      });
+      if (type === "isochrone") {
+        params.set("minutes", document.getElementById("minuteSelect").value);
+      }
+
+      setLoading(true);
+      setStatus(type === "isochrone" ? "正在计算本地等时圈..." : "正在计算 POI 可达性...");
+      try {
+        const endpoint = type === "isochrone" ? "/api/isochrone" : "/api/accessibility";
+        const data = await fetchJson(`${endpoint}?${params.toString()}`);
+        if (type === "isochrone") {
+          plotIsochrone(data);
+        } else {
+          plotAccessibility(data);
+        }
+      } catch (error) {
+        setStatus(error.message, true);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    document.getElementById("modeButtons").addEventListener("click", (event) => {
+      const button = event.target.closest("button[data-mode]");
+      if (!button) return;
+      state.mode = button.dataset.mode;
+      document.querySelectorAll("#modeButtons button").forEach((item) => item.classList.remove("active"));
+      button.classList.add("active");
+      setStatus(`已选择${modeLabels[state.mode]}模式。`);
+    });
+
+    document.querySelectorAll("input[name='analysisType']").forEach((input) => {
+      input.addEventListener("change", () => {
+        const type = document.querySelector("input[name='analysisType']:checked").value;
+        document.getElementById("timeControl").classList.toggle("hidden", type !== "isochrone");
+        setStatus(type === "isochrone" ? "已切换到等时圈分析。" : "已切换到 POI 可达性分析。");
+      });
+    });
+
+    document.getElementById("runButton").addEventListener("click", runAnalysis);
+
+    initMap();
+  </script>
+</body>
+</html>
