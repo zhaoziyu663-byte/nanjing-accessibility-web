@@ -3,6 +3,7 @@ from __future__ import annotations
 import ast
 import json
 import math
+import os
 import time
 from functools import lru_cache
 from pathlib import Path
@@ -661,12 +662,10 @@ def api_accessibility():
 
 load_workspace_data()
 
-import os
-
 
 if __name__ == "__main__":
     print("南京多模式空间可达性网站后端已启动")
     print(f"POI 文件：{startup_summary.get('poi_path')}")
     print(f"启动加载耗时：{startup_summary.get('load_seconds')} 秒")
-    port = int(os.environ.get("PORT", 5000))
+    port = int(os.environ.get("PORT", 7860))
     app.run(host="0.0.0.0", port=port, debug=False)
